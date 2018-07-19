@@ -1,0 +1,148 @@
+---
+- name: Setup DB Server
+  hosts: all 
+  become: yes
+  tags: DB
+  tasks:
+    - name: Install MariaDB Server and Packages
+      package:
+        name: "{{ item }}"
+        state: installed
+      loop:
+        - mariadb-server
+        - MySQL-python
+
+    - name: Start MariaDB Service
+      service:
+        name: mariadb 
+        state: started
+        enabled: yes
+
+    - name: Copy Student.sql file 
+      copy:
+        src: student.sql
+        dest: /tmp/student.sql 
+
+    - name: Load the SQL Schema
+      mysql_db:
+        state: import
+        name: all
+        target: /tmp/student.sql
+
+- name: Setup Application Server 
+  hosts: all
+  become: yes
+  gather_facts: true
+  tags: APP 
+  vars:
+    TOMCAT_URL: http://www-us.apache.org/dist/tomcat/tomcat-9/v9.0.10/bin/apache-tomcat-9.0.10.tar.gz
+    WAR_URL: https://github.com/cit-aliqui/APP-STACK/raw/master/student.war
+    JAR_URL: https://github.com/cit-aliqui/APP-STACK/raw/master/mysql-connector-java-5.1.40.jar
+  tasks:
+    - name: Install Java 
+      package: 
+        name: java
+        state: installed
+
+    - name: Get the tomcat directory 
+      shell: echo "{{TOMCAT_URL}}" |awk -F / '{print $NF}' | sed -e 's/.tar.gz//'
+      register: out 
+
+    - set_fact:
+        TOMCAT_DIR: "{{out.stdout}}"
+
+#    - name: Download tomcat
+#      get_url:
+#        url: "{{TOMCAT_URL}}"
+#        dest: "/opt/{{TARFILE.stdout}}"
+
+    - name: Download and extract tomcat
+      unarchive:
+        src: "{{TOMCAT_URL}}"
+        dest: /opt 
+        remote_src: yes
+
+    - name: Find list of files and directories in webapps
+      find:
+        file_type: any
+        paths: "/opt/{{TOMCAT_DIR}}/webapps"
+      register: out
+
+    - name: Remove the files in webapps
+      file:
+        path: "{{item.path}}"
+        state: absent
+      loop: "{{out.files}}"
+
+    - name: Download War file
+      get_url:
+        url: "{{WAR_URL}}"
+        dest: "/opt/{{TOMCAT_DIR}}/webapps/student.war"
+      
+    - name: Download JDBC Jar file 
+      get_url:
+        url: "{{JAR_URL}}"
+        dest: "/opt/{{TOMCAT_DIR}}/lib/mysql-connector-java-5.1.40.jar"
+
+    - name: Update context.xml file
+      template:
+        src: context.xml.j2
+        dest: /opt/{{TOMCAT_DIR}}/conf/context.xml
+    ### Explain how to access the values from another play , Also explain other options.
+
+    - name: Check tomcat is running or not
+      shell: ps -ef | grep java | grep -v grep 
+      register: out
+      ignore_errors: true
+      ### Explain ignore_errors. 
+
+    - name: Stop if tomcat is running
+      when: out.rc == 0
+      shell: nohup /opt/{{TOMCAT_DIR}}/bin/shutdown.sh 
+
+    - name: Start the tomcat 
+      shell: nohup /opt/{{TOMCAT_DIR}}/bin/startup.sh
+
+- name: Setup Web Server 
+  hosts: all
+  become: yes
+  tags: WEB
+  tasks:
+    - name: Install Web Server 
+      package:
+        name: httpd
+        state: installed
+    
+    - name: Download MOD_JK library.
+      get_url:
+        url: https://github.com/cit-astrum/project-manual/raw/master/mod_jk.so
+        dest: /etc/httpd/modules/mod_jk.so 
+        mode: 0755
+
+    - name: Create mod-jk configuration file 
+      blockinfile:
+        path: /etc/httpd/conf.d/mod-jk.conf
+        create: yes
+        block: | 
+          LoadModule jk_module modules/mod_jk.so
+          JkWorkersFile conf.d/worker.properties
+          JkMount /student local
+          JkMount /student/* local
+
+    - name: Create tomcat workers file 
+      blockinfile:
+        path: /etc/httpd/conf.d/worker.properties 
+        create: yes
+        block: | 
+          worker.list=local
+          worker.local.host=localhost
+          worker.local.port=8009      
+    
+    - name: Restart web service
+      service:
+        name: httpd
+        state: restarted
+        enabled: yes
+
+
+      
