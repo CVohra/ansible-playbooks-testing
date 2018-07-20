@@ -32,5 +32,5 @@
                maxActive="50" maxIdle="30" maxWait="10000"
                username="student" password="student@1"
                driverClassName="com.mysql.jdbc.Driver"
-               url="jdbc:mysql://{{hostvars[groups['DBNODES'][0]]['DBIP']}}:3306/studentapp"/>
+               url="jdbc:mysql://{{ansible_hostname}}:3306/studentapp"/>
 </Context>
