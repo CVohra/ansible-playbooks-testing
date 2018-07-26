@@ -1,0 +1,30 @@
+- name: Deploy APP to Test Environment
+  hosts: all 
+  become: yes
+  vars:
+    TOMCAT_URL: http://www-us.apache.org/dist/tomcat/tomcat-9/v9.0.10/bin/apache-tomcat-9.0.10.tar.gz
+  tasks:
+    - name: Get the tomcat directory 
+      shell: echo "{{TOMCAT_URL}}" |awk -F / '{print $NF}' | sed -e 's/.tar.gz//'
+      register: out 
+
+    - set_fact:
+        TOMCAT_DIR: "{{out.stdout}}"
+
+    - name: Remove the existing war files.
+      find:
+        file_type: any
+        paths: "/opt/{{TOMCAT_DIR}}/webapps"
+      register: out
+
+    - name: Remove the files in webapps
+      file:
+        path: "{{item.path}}"
+        state: absent
+      loop: "{{out.files}}"
+    
+    - name: Copy war file
+      copy:
+        src: target/studentapi.war
+        dest: "/opt/{{TOMCAT_DIR}}/webapps/studentapi.war"
+        
