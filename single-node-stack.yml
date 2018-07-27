@@ -133,8 +133,8 @@
         block: | 
           LoadModule jk_module modules/mod_jk.so
           JkWorkersFile conf.d/worker.properties
-          JkMount /student local
-          JkMount /student/* local
+          JkMount /studentapi local
+          JkMount /studentapi/* local
 
     - name: Create tomcat workers file 
       blockinfile:
