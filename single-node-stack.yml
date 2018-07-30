@@ -19,6 +19,12 @@
         - mariadb-server
         - MySQL-python
 
+    - name: Update lower case tables parameter
+      lineinfile:
+        path: /etc/my.cnf
+        insertafter: '^datadir'
+        line: 'lower_case_table_names=1'
+
     - name: Start MariaDB Service
       service:
         name: mariadb 
