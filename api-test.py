@@ -50,6 +50,9 @@ data = '{"studentName": "Meghan Mahadev","studentAddr": "Hyderabad","studentAge"
 
 response = requests.post(URL_POST, headers=headers, data=data)
 resp_string=str(response.status_code)
+output=response.text
+data = json.loads(output)
+STUDENT_ID=data['data']['object']['student_id']
 response=int(resp_string[:1])
 
 if response == 2:
@@ -57,8 +60,16 @@ if response == 2:
 else:
     print 'STUDENT APP INSERT DATA - FAILURE'
     os.system('exit 1')
-    
 
 
+URL_DELETE="http://"+IP+"/studentapi/student/"+str(STUDENT_ID)
+response = requests.delete(URL_DELETE, headers=headers)
+resp_string =str(response.status_code)
+response=int(resp_string[:1])
+if response == 2:
+    print 'STUDENT APP DELETE DATA - SUCCESS'
+else:
+    print 'STUDENT APP DELETE DATA - FAILURE'
+    os.system('exit 1')
 
 
